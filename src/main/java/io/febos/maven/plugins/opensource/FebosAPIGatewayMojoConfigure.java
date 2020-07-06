@@ -26,9 +26,10 @@ import java.util.*;
 /**
  * Maven Plugin para facilitar la configuración de API Gateway y Lambda. Permite
  * configurar el lmabda y api dateway desde el POM del proyecto maven.
+ *
  * @author Michel M. <michel@febos.cl>
  */
-@Mojo(name = "api",requiresProject = true,requiresDirectInvocation = true)
+@Mojo(name = "api", requiresProject = true, requiresDirectInvocation = true)
 public class FebosAPIGatewayMojoConfigure extends AbstractMojo {
 
     @Parameter
@@ -38,6 +39,8 @@ public class FebosAPIGatewayMojoConfigure extends AbstractMojo {
     @Parameter(defaultValue = "")
     public String credencialesAWS;
     @Parameter
+    public ApiGatewayBase endpointsBase;
+    @Parameter
     public List<ApiGateway> endpoints;
     @Parameter
     public Lambda lambda;
@@ -45,7 +48,7 @@ public class FebosAPIGatewayMojoConfigure extends AbstractMojo {
     public String accountId;
     @Parameter
     public String region;
-    @Parameter(name = "deployFilter",property = "deployFilter")
+    @Parameter(name = "deployFilter", property = "deployFilter")
     public String deployFilter;
     @Parameter
     public String stageDescriptor;
@@ -60,15 +63,15 @@ public class FebosAPIGatewayMojoConfigure extends AbstractMojo {
 
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
-        if(this.deployFilter ==null){
-            this.deployFilter ="";
+        if (this.deployFilter == null) {
+            this.deployFilter = "";
         }
-        if(endpoints!= null){
+        if (endpoints != null) {
             validarEndpointsRepetidos();
         }
         apiClient = AmazonApiGatewayClientBuilder.standard().withRegion(region).build();
         lambdaClient = AWSLambdaClientBuilder.standard().withRegion(region).build();
-        try{
+        try {
             if (endpoints != null) {
                 if (lambdaNuevo) {
                     getLog().info("Configurando API Gateway para el nuevo lambda");
@@ -76,7 +79,7 @@ public class FebosAPIGatewayMojoConfigure extends AbstractMojo {
                     getLog().info("Re-configurando API Gateway para el lambda");
                 }
                 for (ApiGateway gateway : endpoints) {
-                    String[] contentTypes=gateway.contentTypes()==null||gateway.contentTypes().isEmpty()?new String[]{"application/json"}:gateway.contentTypes().split(",");
+                    String[] contentTypes = gateway.contentTypes() == null || gateway.contentTypes().isEmpty() ? new String[]{"application/json"} : gateway.contentTypes().split(",");
                     configurarApiGateway(gateway.api(),
                             gateway.resource(),
                             gateway.metodo(),
@@ -101,22 +104,22 @@ public class FebosAPIGatewayMojoConfigure extends AbstractMojo {
     }
 
     private void validarEndpointsRepetidos() {
-        HashMap<String,String> keys=new HashMap<>();
-        List<ApiGateway> conProblemas= new ArrayList<>();
+        HashMap<String, String> keys = new HashMap<>();
+        List<ApiGateway> conProblemas = new ArrayList<>();
         endpoints.forEach(apiGateway -> {
-            String key = apiGateway.api()+"-"+apiGateway.resource()+"-"+apiGateway.metodo();
-            if(keys.get(key)==null){
-                keys.put(key,key);
-            }else {
+            String key = apiGateway.api() + "-" + apiGateway.resource() + "-" + apiGateway.metodo();
+            if (keys.get(key) == null) {
+                keys.put(key, key);
+            } else {
                 conProblemas.add(apiGateway);
             }
         });
-        if(!conProblemas.isEmpty()){
-            throw new InvalidParameterException("\n======================================================================================================\n\nLos siguientes apis no estan bien configuradas o su api+recurso+metodo se repite con otro metodo "+new Gson().toJson(conProblemas));
+        if (!conProblemas.isEmpty()) {
+            throw new InvalidParameterException("\n======================================================================================================\n\nLos siguientes apis no estan bien configuradas o su api+recurso+metodo se repite con otro metodo " + new Gson().toJson(conProblemas));
         }
     }
 
-    protected void cargarResponseTemplate(String apiID, String resourceID, String verbo, File mappingFileResponse,String[] contentTypes) {
+    protected void cargarResponseTemplate(String apiID, String resourceID, String verbo, File mappingFileResponse, String[] contentTypes) {
         try {
             System.out.print("-> Configurando API para configurar respuestas");
 
@@ -145,11 +148,11 @@ public class FebosAPIGatewayMojoConfigure extends AbstractMojo {
     }
 
 
-    public void configurarApiGateway(String apiID, String resourceID, String verbo, String lambdaName, Map<String, String> template, File mappingFile, File mappingFileResponse, String header, String region, String accountId,String[] contentTypes) {
+    public void configurarApiGateway(String apiID, String resourceID, String verbo, String lambdaName, Map<String, String> template, File mappingFile, File mappingFileResponse, String header, String region, String accountId, String[] contentTypes) {
         if (apiID == null || apiID.isEmpty()) {
             return;
         }
-        getLog().info("RECURSO "+apiID+" - "+resourceID+" - "+verbo+"  mappingFile "+(mappingFile != null)+" mappingFileResponse "+(mappingFileResponse!= null));
+        getLog().info("RECURSO " + apiID + " - " + resourceID + " - " + verbo + "  mappingFile " + (mappingFile != null) + " mappingFileResponse " + (mappingFileResponse != null));
 
         Template template1 = null;
         if (mappingFile != null) {
@@ -157,14 +160,17 @@ public class FebosAPIGatewayMojoConfigure extends AbstractMojo {
             template1 = new Template(mappingFile).invoke();
         } else {
             getLog().info("CARGANDO DESDE MAP");
+            if (this.endpointsBase != null && this.endpointsBase.getMapping() != null && !this.endpointsBase.getMapping().isEmpty()) {
+                verificarEndpointBase(template, this.endpointsBase.getMapping());
+            }
             template1 = new Template(template).invoke();
 
         }
-        if(template1.handler != null && this.deployFilter != null && (!template1.handler.startsWith(this.deployFilter) && !resourceID.equalsIgnoreCase(this.deployFilter))){
+        if (template1.handler != null && this.deployFilter != null && (!template1.handler.startsWith(this.deployFilter) && !resourceID.equalsIgnoreCase(this.deployFilter))) {
             return;
         }
-        if(!this.deployFilter.isEmpty()){
-            System.out.println("Deployando API con el filtro: "+this.deployFilter);
+        if (!this.deployFilter.isEmpty()) {
+            System.out.println("Deployando API con el filtro: " + this.deployFilter);
         }
 
         Map<String, String> emptyModels = new HashMap<>();
@@ -256,10 +262,10 @@ public class FebosAPIGatewayMojoConfigure extends AbstractMojo {
         tmplXml = template1.getTmplXml();
 
         for (String contentType : contentTypes) {
-            getLog().info("CONFIGURANDO CONTENT TYPE ["+contentType+"]");
-            if(contentType.equals("application/xml")){
+            getLog().info("CONFIGURANDO CONTENT TYPE [" + contentType + "]");
+            if (contentType.equals("application/xml")) {
                 velocity.put("application/xml", tmplXml);
-            }else {
+            } else {
                 velocity.put(contentType, tmplJson);
             }
         }
@@ -370,17 +376,17 @@ public class FebosAPIGatewayMojoConfigure extends AbstractMojo {
         Map<String, String> params = new HashMap<>();
         Map<String, String> l = new HashMap<>();
         if (mappingFileResponse != null && mappingFileResponse.exists()) {
-            getLog().info("CARGANDO mappingFileResponse "+mappingFileResponse.getAbsolutePath());
-            Template templateR = new Template(mappingFileResponse,false).invoke();
+            getLog().info("CARGANDO mappingFileResponse " + mappingFileResponse.getAbsolutePath());
+            Template templateR = new Template(mappingFileResponse, false).invoke();
             Map<String, String> velocityR = new HashMap<>();
 
             //velocityR.put("application/json", templateR.getTmplJson());
             //velocityR.put("application/xml", "Empty");
 
             for (String contentType : contentTypes) {
-                if(contentType.equals("application/xml")){
+                if (contentType.equals("application/xml")) {
                     velocityR.put("application/xml", tmplXml);
-                }else {
+                } else {
                     velocityR.put(contentType, templateR.getTmplJson());
                 }
             }
@@ -444,6 +450,14 @@ public class FebosAPIGatewayMojoConfigure extends AbstractMojo {
         pirr.setResponseParameters(params);
         FebosAPIGatewayMojoConfigure.apiClient.putIntegrationResponse(pirr);
         System.out.print("[OK]\n");
+    }
+
+    private void verificarEndpointBase(Map<String, String> template, LinkedHashMap<String, String> mapping) {
+        mapping.forEach((key, value) -> {
+            if (!template.containsKey(key)) {
+                template.put(key, value);
+            }
+        });
     }
 
 
