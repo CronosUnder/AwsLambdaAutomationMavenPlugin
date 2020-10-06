@@ -61,9 +61,6 @@ public class FebosLambdaMojoConfigure extends AbstractMojo {
     @Parameter(defaultValue = "${project}", readonly = true, required = true)
     private MavenProject project;
 
-    @Parameter(name = "ejecucionId", property = "ejecucionId")
-    public String deployFilter;
-
     @Parameter(name = "ambienteDestino", property = "ambienteDestino")
     public String ambienteDestino;
 
@@ -421,13 +418,14 @@ public class FebosLambdaMojoConfigure extends AbstractMojo {
             }
 
             if (maxVer > 0 && (ambienteDestino != null && !ambienteDestino.trim().isEmpty())) {
-                UpdateAliasRequest updateRequest = new UpdateAliasRequest();
-                updateRequest.setFunctionName(lambda.nombre());
-                updateRequest.setFunctionVersion(maxVer + "");
-                updateRequest.setName(ambienteDestino);
-                UpdateAliasResult resp = lambdaClient.updateAlias(updateRequest);
-                getLog().info("AMBIENTE ASIGNADO "+maxVer+" "+ambienteDestino);
-
+                for (String ambiente : ambienteDestino.split(",")) {
+                    UpdateAliasRequest updateRequest = new UpdateAliasRequest();
+                    updateRequest.setFunctionName(lambda.nombre());
+                    updateRequest.setFunctionVersion(maxVer + "");
+                    updateRequest.setName(ambiente);
+                    UpdateAliasResult resp = lambdaClient.updateAlias(updateRequest);
+                    getLog().info("AMBIENTE ASIGNADO "+maxVer+" "+ambienteDestino);
+                }
             }
 
         } catch (Exception e) {
