@@ -10,10 +10,8 @@ import com.amazonaws.event.ProgressEvent;
 import com.amazonaws.event.ProgressListener;
 import com.amazonaws.services.apigateway.AmazonApiGateway;
 import com.amazonaws.services.apigateway.AmazonApiGatewayClientBuilder;
-import com.amazonaws.services.apigateway.model.*;
+import com.amazonaws.services.apigateway.model.Method;
 import com.amazonaws.services.lambda.AWSLambda;
-import com.amazonaws.services.lambda.AWSLambdaAsync;
-import com.amazonaws.services.lambda.AWSLambdaAsyncClientBuilder;
 import com.amazonaws.services.lambda.AWSLambdaClientBuilder;
 import com.amazonaws.services.lambda.model.*;
 import com.amazonaws.services.s3.AmazonS3;
@@ -24,7 +22,6 @@ import io.febos.development.plugins.febos.maven.permisos.PermisoPlugin;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
-import org.apache.maven.plugins.annotations.Component;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.project.MavenProject;
@@ -33,10 +30,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.*;
 
 /**
@@ -68,6 +61,12 @@ public class FebosLambdaMojoConfigure extends AbstractMojo {
     @Parameter(defaultValue = "${project}", readonly = true, required = true)
     private MavenProject project;
 
+    @Parameter(name = "ejecucionId", property = "ejecucionId")
+    public String deployFilter;
+
+    @Parameter(name = "ambienteDestino", property = "ambienteDestino")
+    public String ambienteDestino;
+
     CustomCredentialsProvider credenciales;
     public static AmazonS3 s3client;
     public static AWSLambda lambdaClient;
@@ -80,7 +79,7 @@ public class FebosLambdaMojoConfigure extends AbstractMojo {
 
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
-
+        int maxVersion = 0;
         apiClient = AmazonApiGatewayClientBuilder.standard().withRegion(region).build();
         lambdaClient = AWSLambdaClientBuilder.standard().withRegion(region).build();
         Map<Integer, List<String>> aliases = new HashMap<>();
@@ -144,7 +143,6 @@ public class FebosLambdaMojoConfigure extends AbstractMojo {
             });
             s3client.putObject(putObjectRequest);
             getLog().info("--> [OK]");
-
             //leyendo properties para establecer permisos
             String ruta = new File(lambda.localFile()).getParentFile().getAbsolutePath();
             ruta += ruta.endsWith("/") ? "" : "/";
@@ -174,7 +172,8 @@ public class FebosLambdaMojoConfigure extends AbstractMojo {
             if (!functionExists(lambda.nombre())) {
                 try {
                     new PermisoPlugin().crearCredencialesBd(project.getArtifactId());
-                }catch (Exception e){}
+                } catch (Exception e) {
+                }
                 lambdaNuevo = true;
                 getLog().info("Creando funcion  lambda " + lambda.nombre());
                 try {
@@ -320,8 +319,12 @@ public class FebosLambdaMojoConfigure extends AbstractMojo {
                 if (vpcConfig != null) {
                     configureLambda.withVpcConfig(vpcConfig);
                 }
-                lambdaClient.updateFunctionConfiguration(configureLambda);
+                UpdateFunctionConfigurationResult configurada = lambdaClient.updateFunctionConfiguration(configureLambda);
                 getLog().info("--> [OK]");
+                try {
+                    maxVersion = Integer.parseInt(configurada.getVersion());
+                } catch (Exception e) {
+                }
             }
 
             HashMap<Integer, String> versiones = new HashMap<>();
@@ -329,7 +332,6 @@ public class FebosLambdaMojoConfigure extends AbstractMojo {
             ListVersionsByFunctionRequest reqListVersiones = new ListVersionsByFunctionRequest();
             reqListVersiones.setFunctionName(lambda.nombre());
             ListVersionsByFunctionResult listVersionsByFunction = lambdaClient.listVersionsByFunction(reqListVersiones);
-            int maxVersion = 0;
             for (FunctionConfiguration conf : listVersionsByFunction.getVersions()) {
                 if (!conf.getVersion().equals("$LATEST")) {
                     int ver = Integer.parseInt(conf.getVersion());
@@ -348,15 +350,6 @@ public class FebosLambdaMojoConfigure extends AbstractMojo {
                     DeleteAliasRequest eliminarAliasReq = new DeleteAliasRequest().withFunctionName(lambda.nombre()).withName(alias.getName());
                     DeleteAliasResult deleteAliasResult = lambdaClient.deleteAlias(eliminarAliasReq);
                 }
-                /*if(alias.getName().equalsIgnoreCase("v"+project.getVersion().replaceAll("\\.","_"))){
-                    try {
-                        getLog().info(" ** Ya existia un alias para esta versión del lambda, se reemplaza alias por nueva versión");
-                        DeleteAliasRequest eliminarAliasReq = new DeleteAliasRequest().withFunctionName(lambda.nombre()).withName("v" + project.getVersion().replaceAll("\\.", "_"));
-                        DeleteAliasResult deleteAliasResult = lambdaClient.deleteAlias(eliminarAliasReq);
-                    }catch(Exception e){
-                        //NO SE PUDO BORRAR LA VERSION
-                    }
-                }*/
                 if (!alias.getFunctionVersion().equals("$LATEST")) {
                     versiones.put(Integer.parseInt(alias.getFunctionVersion().trim()), alias.getName());
                 }
@@ -411,17 +404,30 @@ public class FebosLambdaMojoConfigure extends AbstractMojo {
                     invokeRequest.setQualifier(stageName);
                 }
 
-                HashMap<String, String> request = new HashMap<>();
-                request.put("functionClass", lambda.warmerHandler);
-                request.put("requestClass", lambda.warmerRequest);
-                request.put("responseClass", lambda.warmerResponse);
-                request.put("stage", stageName);
+                try {
+                    HashMap<String, String> request = new HashMap<>();
+                    request.put("functionClass", lambda.warmerHandler);
+                    request.put("requestClass", lambda.warmerRequest);
+                    request.put("responseClass", lambda.warmerResponse);
+                    request.put("stage", stageName);
 
-                String payload = new Gson().toJson(request);
+                    String payload = new Gson().toJson(request);
 
-                invokeRequest.setPayload(payload);
-                InvokeResult invoke = cliente.invoke(invokeRequest);
-                getLog().info(new String(invoke.getPayload().array()));
+                    invokeRequest.setPayload(payload);
+                    InvokeResult invoke = cliente.invoke(invokeRequest);
+                    getLog().info(new String(invoke.getPayload().array()));
+                } catch (Exception e) {
+                }
+            }
+
+            if (maxVer > 0 && (ambienteDestino != null && !ambienteDestino.trim().isEmpty())) {
+                UpdateAliasRequest updateRequest = new UpdateAliasRequest();
+                updateRequest.setFunctionName(lambda.nombre());
+                updateRequest.setFunctionVersion(maxVer + "");
+                updateRequest.setName(ambienteDestino);
+                UpdateAliasResult resp = lambdaClient.updateAlias(updateRequest);
+                getLog().info("AMBIENTE ASIGNADO "+maxVer+" "+ambienteDestino);
+
             }
 
         } catch (Exception e) {
@@ -446,4 +452,6 @@ public class FebosLambdaMojoConfigure extends AbstractMojo {
         return false;
     }
 
+    public static void main(String[] args) {
+    }
 }
