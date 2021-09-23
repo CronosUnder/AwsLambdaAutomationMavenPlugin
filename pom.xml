@@ -4,7 +4,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>io.febos.development.plugins</groupId>
     <artifactId>aws-configure-maven-plugin</artifactId>
-    <version>1.36</version>
+    <version>1.37</version>
     <packaging>maven-plugin</packaging>
     <name>Febos maven plugin</name>
     <description>Maven plugin to configure and deploy lambdas on AWS</description>
@@ -34,8 +34,13 @@
             <url>s3://maven.febos.io/release</url>
         </repository>
     </repositories>
-
     <dependencies>
+        <!-- https://mvnrepository.com/artifact/software.amazon.awssdk/lambda -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>lambda</artifactId>
+            <version>2.17.44</version>
+        </dependency>
         <dependency>
             <groupId>com.amazonaws</groupId>
             <artifactId>aws-java-sdk-api-gateway</artifactId>

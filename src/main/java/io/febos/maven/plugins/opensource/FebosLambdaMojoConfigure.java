@@ -25,12 +25,16 @@ import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.project.MavenProject;
+import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.lambda.LambdaClient;
+import software.amazon.awssdk.services.lambda.model.GetFunctionResponse;
 
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.*;
+import java.util.function.Consumer;
 
 /**
  * Maven Plugin para facilitar la configuración de API Gateway y Lambda. Permite
@@ -265,10 +269,10 @@ public class FebosLambdaMojoConfigure extends AbstractMojo {
                         .withPublish(true)
                         .withS3Bucket(bucket)
                         .withS3Key(s3path);
-
                 lambdaClient.updateFunctionCode(updateLambda);
                 getLog().info("--> [OK]");
                 getLog().info("Actualizando configuracion");
+                whaitStatusOk(lambda.nombre());
                 UpdateFunctionConfigurationRequest configureLambda = new UpdateFunctionConfigurationRequest();
                 VpcConfig vpcConfig = null;
 
@@ -317,6 +321,7 @@ public class FebosLambdaMojoConfigure extends AbstractMojo {
                     configureLambda.withVpcConfig(vpcConfig);
                 }
                 UpdateFunctionConfigurationResult configurada = lambdaClient.updateFunctionConfiguration(configureLambda);
+                whaitStatusOk(lambda.nombre());
                 getLog().info("--> [OK]");
                 try {
                     maxVersion = Integer.parseInt(configurada.getVersion());
@@ -424,7 +429,7 @@ public class FebosLambdaMojoConfigure extends AbstractMojo {
                     updateRequest.setFunctionVersion(maxVer + "");
                     updateRequest.setName(ambiente);
                     UpdateAliasResult resp = lambdaClient.updateAlias(updateRequest);
-                    getLog().info("AMBIENTE ASIGNADO "+maxVer+" "+ambienteDestino);
+                    getLog().info("AMBIENTE ASIGNADO " + maxVer + " " + ambienteDestino);
                 }
             }
 
@@ -450,6 +455,28 @@ public class FebosLambdaMojoConfigure extends AbstractMojo {
         return false;
     }
 
+    public boolean whaitStatusOk(String name) {
+        LambdaClient awsLambdaClient = LambdaClient.builder().region(Region.of(region)).build();
+        try {
+            boolean isOk = false;
+            while (!isOk) {
+                software.amazon.awssdk.services.lambda.model.GetFunctionRequest gfr = software.amazon.awssdk.services.lambda.model.GetFunctionRequest.builder().functionName(name).build();
+                GetFunctionResponse funcion = awsLambdaClient.getFunction(gfr);
+                if (funcion != null && funcion.configuration().lastUpdateStatus().values()[0].toString().equals("Successful")) {
+                        return true;
+                }else {
+                    Thread.sleep(2000);
+                }
+            }
+        } catch (Exception e) {
+            return false;
+        }
+        return false;
+    }
+
     public static void main(String[] args) {
+        FebosLambdaMojoConfigure ap = new FebosLambdaMojoConfigure();
+        ap.region = "us-east-1";
+        ap.whaitStatusOk("io_comunes");
     }
 }
