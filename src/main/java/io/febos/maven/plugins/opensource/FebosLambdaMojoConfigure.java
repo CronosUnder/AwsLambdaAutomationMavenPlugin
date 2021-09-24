@@ -89,8 +89,8 @@ public class FebosLambdaMojoConfigure extends AbstractMojo {
             Gson g = new Gson();
             getLog().info("REGION  " + region);
             getLog().info("CUENTA  " + accountId);
-            getLog().info("LAMBDA " + g.toJson(lambda));
-            getLog().info("Endponts " + g.toJson(endpoints));
+//            getLog().info("LAMBDA " + g.toJson(lambda));
+//            getLog().info("Endponts " + g.toJson(endpoints));
         } catch (Exception e) {
 
         }
@@ -143,7 +143,7 @@ public class FebosLambdaMojoConfigure extends AbstractMojo {
                 }
             });
             s3client.putObject(putObjectRequest);
-            getLog().info("--> [OK]");
+            getLog().info("---> [OK]");
             //leyendo properties para establecer permisos
             String ruta = new File(lambda.localFile()).getParentFile().getAbsolutePath();
             ruta += ruta.endsWith("/") ? "" : "/";
@@ -215,7 +215,7 @@ public class FebosLambdaMojoConfigure extends AbstractMojo {
                                 nuevoLambda.getEnvironment().addVariablesEntry(key, value);
                             }
                         }
-                        getLog().info("--> [OK]");
+                        getLog().info("---> [OK]");
                     } catch (Exception e) {
                         e.printStackTrace();
                     }
@@ -227,7 +227,7 @@ public class FebosLambdaMojoConfigure extends AbstractMojo {
                     }
                     CreateFunctionResult createFunction = lambdaClient.createFunction(nuevoLambda);
                     System.out.println(new Gson().toJson(createFunction));
-                    getLog().info("--> [OK]");
+                    getLog().info("---> [OK]");
                     String[] ambientes = lambda.stages != null ? lambda.stages.split(",") : "".split(",");
                     getLog().info("Creando alias para los distintos ambientes");
                     for (String ambiente : ambientes) {
@@ -249,14 +249,14 @@ public class FebosLambdaMojoConfigure extends AbstractMojo {
                                 .withAction("lambda:InvokeFunction")
                         );
                     }
-                    getLog().info("--> [OK]");
+                    getLog().info("---> [OK]");
                     getLog().info("--> Creando Alias de versión");
                     lambdaClient.createAlias(new CreateAliasRequest()
                             .withFunctionName(lambda.nombre())
                             .withName("v" + project.getVersion().replaceAll("\\.", "_"))
                             .withFunctionVersion("$LATEST")
                     );
-                    getLog().info("--> [OK]");
+                    getLog().info("---> [OK]");
                 } catch (Exception e) {
                     e.printStackTrace();
                     throw new RuntimeException("Error al ejecutar plugin");
@@ -270,12 +270,11 @@ public class FebosLambdaMojoConfigure extends AbstractMojo {
                         .withS3Bucket(bucket)
                         .withS3Key(s3path);
                 lambdaClient.updateFunctionCode(updateLambda);
-                getLog().info("--> [OK]");
-                getLog().info("Actualizando configuracion");
+                getLog().info("---> [OK]");
                 whaitStatusOk(lambda.nombre());
+                getLog().info("Actualizando configuracion");
                 UpdateFunctionConfigurationRequest configureLambda = new UpdateFunctionConfigurationRequest();
                 VpcConfig vpcConfig = null;
-
                 if (lambda.vpc() != null) {
                     vpcConfig = new VpcConfig();
                     String[] securityGroups = lambda.vpc().split("SecurityGroupIds")[1].replace("=", "").split(",");
@@ -310,7 +309,7 @@ public class FebosLambdaMojoConfigure extends AbstractMojo {
                             configureLambda.getEnvironment().addVariablesEntry(key, value);
                         }
                     }
-                    getLog().info("--> [OK]");
+                    getLog().info("---> [OK]");
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -320,9 +319,9 @@ public class FebosLambdaMojoConfigure extends AbstractMojo {
                 if (vpcConfig != null) {
                     configureLambda.withVpcConfig(vpcConfig);
                 }
+                getLog().info("--> LLAMAMOS A ACTUALIZACION");
                 UpdateFunctionConfigurationResult configurada = lambdaClient.updateFunctionConfiguration(configureLambda);
-                whaitStatusOk(lambda.nombre());
-                getLog().info("--> [OK]");
+                getLog().info("---> [OK]");
                 try {
                     maxVersion = Integer.parseInt(configurada.getVersion());
                 } catch (Exception e) {
@@ -462,10 +461,11 @@ public class FebosLambdaMojoConfigure extends AbstractMojo {
             while (!isOk) {
                 software.amazon.awssdk.services.lambda.model.GetFunctionRequest gfr = software.amazon.awssdk.services.lambda.model.GetFunctionRequest.builder().functionName(name).build();
                 GetFunctionResponse funcion = awsLambdaClient.getFunction(gfr);
-                if (funcion != null && funcion.configuration().lastUpdateStatus().values()[0].toString().equals("Successful")) {
-                        return true;
+                getLog().info("CONSULTAMOS ESTADO : "+funcion.configuration().lastUpdateStatusAsString());
+                if (!funcion.configuration().lastUpdateStatusAsString().equals("Successful")) {
                 }else {
                     Thread.sleep(2000);
+                    return true;
                 }
             }
         } catch (Exception e) {
