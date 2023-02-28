@@ -279,8 +279,6 @@ public class FebosLambdaMojoConfigure extends AbstractMojo {
                     vpcConfig = new VpcConfig();
                     String[] securityGroups = lambda.vpc().split("SecurityGroupIds")[1].replace("=", "").split(",");
                     String[] subnets = lambda.vpc().split(",SecurityGroupIds")[0].replace("SubnetIds=", "").split(",");
-                    //vpcConfig.withSecurityGroupIds(lambda.vpc().split(",")[1].split("=")[1]);
-                    //vpcConfig.withSubnetIds(lambda.vpc().split(",")[0].split("=")[1]);
                     vpcConfig.withSecurityGroupIds(securityGroups);
                     vpcConfig.withSubnetIds(subnets);
 
@@ -299,7 +297,6 @@ public class FebosLambdaMojoConfigure extends AbstractMojo {
                 try {
                     getLog().info("Seteando variables de entorno para el lambda");
                     configureLambda.setEnvironment(new Environment());
-
                     for (Map.Entry<Object, Object> set : prop.entrySet()) {
                         if (((String) set.getKey()).startsWith("febos")) {
                             String key = (String) set.getKey();
@@ -428,7 +425,7 @@ public class FebosLambdaMojoConfigure extends AbstractMojo {
                     updateRequest.setFunctionVersion(maxVer + "");
                     updateRequest.setName(ambiente);
                     UpdateAliasResult resp = lambdaClient.updateAlias(updateRequest);
-                    getLog().info("AMBIENTE ASIGNADO " + maxVer + " " + ambienteDestino);
+                    getLog().info("AMBIENTE ASIGNADO " + maxVer + " " + ambiente);
                 }
             }
 
