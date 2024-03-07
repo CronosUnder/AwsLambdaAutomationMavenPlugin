@@ -34,7 +34,6 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.*;
-import java.util.function.Consumer;
 
 /**
  * Maven Plugin para facilitar la configuración de API Gateway y Lambda. Permite
@@ -52,6 +51,8 @@ public class FebosLambdaMojoConfigure extends AbstractMojo {
     String credencialesAWS;
     @Parameter
     List<ApiGateway> endpoints;
+    @Parameter(defaultValue = "java8")
+    String runtime;
     @Parameter
     Lambda lambda;
     @Parameter
@@ -198,7 +199,7 @@ public class FebosLambdaMojoConfigure extends AbstractMojo {
                             .withHandler(lambda.handler())
                             .withMemorySize(lambda.ram())
                             .withTimeout(lambda.timeout())
-                            .withRuntime("java8")
+                            .withRuntime(runtime)
                             .withCode(new FunctionCode().withS3Bucket(bucket).withS3Key(s3path));
                     if (lambda.layers != null && lambda.layers.length > 0) {
                         nuevoLambda.withLayers(lambda.layers);
@@ -289,7 +290,7 @@ public class FebosLambdaMojoConfigure extends AbstractMojo {
                         .withDescription("[v" + project.getVersion() + "] " + lambda.descripcion())
                         .withHandler(lambda.handler())
                         .withMemorySize(lambda.ram())
-                        .withRuntime("java8");
+                        .withRuntime(runtime);
                 if (lambda.layers != null && lambda.layers.length > 0) {
                     configureLambda.withLayers(lambda.layers);
                 }
@@ -458,9 +459,9 @@ public class FebosLambdaMojoConfigure extends AbstractMojo {
             while (!isOk) {
                 software.amazon.awssdk.services.lambda.model.GetFunctionRequest gfr = software.amazon.awssdk.services.lambda.model.GetFunctionRequest.builder().functionName(name).build();
                 GetFunctionResponse funcion = awsLambdaClient.getFunction(gfr);
-                getLog().info("CONSULTAMOS ESTADO : "+funcion.configuration().lastUpdateStatusAsString());
+                getLog().info("CONSULTAMOS ESTADO : " + funcion.configuration().lastUpdateStatusAsString());
                 if (!funcion.configuration().lastUpdateStatusAsString().equals("Successful")) {
-                }else {
+                } else {
                     Thread.sleep(2000);
                     return true;
                 }
