@@ -206,15 +206,12 @@ public class FebosLambdaMojoConfigure extends AbstractMojo {
                     }
                     try {
                         getLog().info("Seteando variables de entorno para el lambda " + lambda.nombre());
-                        nuevoLambda.setEnvironment(new Environment());
-                        for (Map.Entry<Object, Object> set : prop.entrySet()) {
-                            if (((String) set.getKey()).startsWith("febos")) {
-                                String key = (String) set.getKey();
-                                key = key.replaceAll("\\.", "_");
-                                String value = (String) set.getValue();
-                                getLog().info("  -> " + key + " = " + value);
-                                nuevoLambda.getEnvironment().addVariablesEntry(key, value);
-                            }
+                        for (Map.Entry<String, String> set : lambda.getEnvironments().entrySet()) {
+                            String key = (String) set.getKey();
+                            key = key.replaceAll("\\.", "_");
+                            String value = (String) set.getValue();
+                            getLog().info("  -> " + key + " = " + value);
+                            nuevoLambda.getEnvironment().addVariablesEntry(key, value);
                         }
                         getLog().info("---> [OK]");
                     } catch (Exception e) {
