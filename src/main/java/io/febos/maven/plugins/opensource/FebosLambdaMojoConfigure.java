@@ -311,6 +311,19 @@ public class FebosLambdaMojoConfigure extends AbstractMojo {
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
+
+                try {
+                    getLog().info("Seteando variables de entorno desde el mapa environments");
+                    configureLambda.setEnvironment(new Environment());
+                    for (Map.Entry<String, String> entry : lambda.getEnvironments().entrySet()) {
+                        getLog().info("  -> " + entry.getKey() + " = " + entry.getValue());
+                        configureLambda.getEnvironment().addVariablesEntry(entry.getKey(), entry.getValue());
+                    }
+                    getLog().info("---> [OK]");
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+
                 if (lambda.role() != null && !lambda.role().isEmpty()) {
                     configureLambda.withRole(lambda.role());
                 }
